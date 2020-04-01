@@ -1,10 +1,14 @@
-import itertools
 import math
-import re
-from random import shuffle
+import sys
+
+import nltk
+
+if not sys.warnoptions:
+    import warnings
+
+    warnings.simplefilter("ignore")
 
 from util import create_dataset, get_vocabulary
-from nltk import ngrams
 from collections import Counter
 from itertools import combinations
 from nltk import bleu
@@ -19,9 +23,9 @@ def get_word_count(raw_text):
     :param raw_text: A list of sentence
     :return: a dictionary of words where the key:word and value:relative count
     """
-    word_list = [word for sentence in raw_text for word in sentence.split(' ')]
-    word_count = Counter(word_list)
-    num_words = len(word_list)
+    vocabulary = [word for sentence in raw_text for word in sentence.split(' ')]
+    word_count = Counter(vocabulary)
+    num_words = len(vocabulary)
     return dict([(word, count / num_words) for word, count in word_count.items()])
 
 
@@ -31,11 +35,13 @@ def get_bi_grams_count(raw_text):
     :param raw_text: A list of sentences
     :return: a dictionary of big_grams where keys:bi_grams and values:relative count
     """
-    bi_grams = itertools.chain.from_iterable([combinations(sentence.split(' '), 2) for sentence in raw_text])
-    bi_grams = [' '.join(bi_gram) for bi_gram in bi_grams]
-    bi_gram_count = Counter(bi_grams)
+    bi_grams = []
+    for sentence in raw_text:
+        bi_grams.extend(list(nltk.bigrams(sentence.split())))
     num_bi_grams = len(bi_grams)
-    return dict([(bi_gram, count / num_bi_grams) for bi_gram, count in bi_gram_count.items()])
+    bi_gram_count = dict([(bi_gram, count / num_bi_grams) for bi_gram, count in Counter(bi_grams).items()])
+
+    return bi_gram_count
 
 
 class PMI:
@@ -62,7 +68,7 @@ class PMI:
         y = pair[1]
         p_x = self.word_count[x]
         p_y = self.word_count[y]
-        p_xy = self.bi_grams_count[' '.join(pair)]
+        p_xy = self.bi_grams_count[pair]
         return math.log(p_xy / (p_x * p_y), 2)
 
     def get_all_pmi(self):
@@ -70,14 +76,19 @@ class PMI:
          Calculates all the possible Point-wise Mutual Information of the words bi_grams
         :return: A dictionary of key:bi_gram value: Point-wise Mutual Information associated
         """
-        self.all_pmi = [(bi_gram, self.get_pmi(bi_gram.split(' '))) for bi_gram in self.bi_grams_count.keys()]
+        self.all_pmi = [(bi_gram, self.get_pmi(bi_gram)) for bi_gram in self.bi_grams_count.keys()
+                        if self.get_pmi(bi_gram) > 0]
 
-        return dict([pmi_p for pmi_p in self.all_pmi if pmi_p[-1] > 0])
+        return dict(self.all_pmi)
 
 
 # ref = 'semeia-se corpo animal , ressucitara corpo esperitual . se ha corpo animal , ha tambem corpo esperitual'
 # test_bleu = bleu(hypothesis=sentence_pt.split(' '), references=[sentence_pt.split(' '), ref.split(' ')],
 # auto_reweigh=True)
+def swap_position(bi_tuple):
+    bi_tuple[0], bi_tuple[1] = bi_tuple[1], bi_tuple[0]
+    return bi_tuple
+
 
 class EATranslator:
     """
@@ -86,12 +97,13 @@ class EATranslator:
     generation = None
     vocabulary = None
     target_sentence = ''
-    words_pmis = dict()
+    pmi = None
     selected_pairs = ()
 
     def __init__(self, sentences_list, target_sentence):
         self.vocabulary = get_vocabulary(sentences_list)
         self.target_sentence = target_sentence
+        self.pmi = PMI(sentences_list).get_all_pmi()
         self.words_pmis = PMI(sentences_list).get_all_pmi()
 
     def initialize_population(self):
@@ -111,7 +123,8 @@ class EATranslator:
     def select_pairs(self):
 
         """
-         Select the pairs for the next generation
+         Select the pairs for the next generation based on the Point-Wise Mutual Information. Words with such information
+         have the chance to reach the next generation.
         :return:
         """
 
@@ -120,23 +133,28 @@ class EATranslator:
         for pair in pairs:
 
             try:
-                pmi = self.words_pmis[' '.join(pair)]
+                pmi = self.words_pmis[pair]
                 next_generation.append((pair, pmi))
             except KeyError:
-                pass
+                try:
+                    pmi = self.words_pmis[tuple(swap_position(list(pair)))]
+                    next_generation.append((tuple(swap_position(list(pair))), pmi))
+                except KeyError:
+                    pass
 
         self.generation = next_generation
 
     def run_evaluations(self):
         self.initialize_population()
+
         self.select_pairs()
-        print(self.generation)
+
         next_generation = [tup[0][0] for tup in self.generation]
         self.vocabulary = [tup[0][1] for tup in self.generation]
+
         self.vocabulary.extend(next_generation)
 
         self.vocabulary = set(self.vocabulary)
-
         # Select the first best parents
         evaluation_array = []
         for n_gram in self.generation:
@@ -150,16 +168,18 @@ class EATranslator:
         # ------------------------------------------------------------
 
         i = 0
-        last_fitness = 0
-        # Search for the best children
-        smooth_function = SmoothingFunction()
+        """"""
+        print(parents)
         while len(self.target_sentence.split(' ')) > i:
+
+            evaluation_array = []
             for word in self.vocabulary:
-                parents.append(word)
-                test_bleu = bleu(hypothesis=parents, references=[self.target_sentence.split(' ')],
-                                 auto_reweigh=True)
-                evaluation_array.append((word, test_bleu))
-                parents = parents[:-1]
+                if sys.intern(word) is not sys.intern(parents[-1]):
+                    parents.append(word)
+                    fitness = bleu(hypothesis=parents, references=[self.target_sentence.split(' ')],
+                                   auto_reweigh=True)
+                    parents = parents[:-1]
+                    evaluation_array.append((word, fitness))
 
             evaluation_array.sort(key=lambda tup: tup[-1], reverse=True)
             i += 1
@@ -172,11 +192,8 @@ class EATranslator:
 
 def main():
     gu, pt = create_dataset(PATH, 1000)
-
-    selection = PMI(pt)
-    pmis = selection.get_all_pmi()
-    print(pt[0])
-    eatranslator = EATranslator(pt, pt[0])
+    print(pt[1])
+    eatranslator = EATranslator(pt, pt[1])
     eatranslator.run_evaluations()
 
 
