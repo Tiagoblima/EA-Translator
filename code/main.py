@@ -22,10 +22,11 @@ def main():
     print(pt[1])
     eatranslator = EATranslator(pt, pt[1])
     eatranslator.run_evaluations()"""
-    pt_en = get_dic()
-    en, pt = create_dataset(PATH, 20000, 5000)
 
-    eatranslator = EATranslator(pt, en[10000], pt[10000])
+    pt_en = get_dic()
+    en, pt = create_dataset(PATH, 30000)
+
+    eatranslator = EATranslator(pt, en[80], pt[80])
     eatranslator.run_evaluations()
     print(len(pt_en.keys()))
 

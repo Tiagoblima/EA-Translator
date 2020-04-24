@@ -90,11 +90,11 @@ def unicode_to_ascii(s):
 # 1. Remove the accents
 # 2. Clean the sentences
 # 3. Return word pairs in the format: [ENGLISH, SPANISH]
-def create_dataset(path, num_examples, start=0):
+def create_dataset(path, num_examples, start=5000):
     lines = io.open(path, encoding='UTF-8').read().strip().split('\n')
 
     word_pairs = [[preprocess_sentence(w) for w in l.split('\t')[:-1]] for l in lines[start:
-                                                                                      start+num_examples]]
+                                                                                      start + num_examples]]
 
     return zip(*word_pairs)
 
@@ -103,6 +103,3 @@ def get_vocabulary(text):
     var = [word for sentence in text for word in sentence.split(' ')]
 
     return set(var)
-
-
-

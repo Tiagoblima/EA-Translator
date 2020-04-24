@@ -1,10 +1,10 @@
 import itertools
 import math
+import re
 import sys
-
 import nltk
-
 from util import get_vocabulary
+from unidecode import unidecode
 
 if not sys.warnoptions:
     import warnings
@@ -91,11 +91,12 @@ def swap_position(bi_tuple):
 
 
 def clean_text(text_list):
-    stop_list = ['Article', 'Adverb', 'Noun', 'Adjective', 'Verb', '[', ']', 'Pronoun', '\n', '\\']
+    stop_list = ['Article', 'Adverb', 'Noun', 'Adjective', 'Verb', r'\[', r'\]', 'Pronoun', r'[\n]', r'[\\]',
+                 r'\([^()]*\)', r'\^', r'[//]']
     for i, text in enumerate(text_list):
 
-        for word in stop_list:
-            text = text.replace(word, '')
+        for regex in stop_list:
+            text = unidecode(re.sub(regex, '', text).strip())
 
         text_list[i] = text
     return text_list
