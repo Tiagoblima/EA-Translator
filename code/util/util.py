@@ -1,6 +1,12 @@
 import io
 import re
 import unicodedata
+from nltk import RegexpTokenizer
+from pysinonimos.sinonimos import Search
+from textblob import TextBlob
+from textblob.exceptions import NotTranslated
+import pandas as pd
+PATH = '../Resource/por.txt'
 
 
 class Stack:
@@ -67,8 +73,6 @@ def preprocess_sentence(w):
     # creating a space between a word and the punctuation following it eg: "he is a boy." => "he is a boy ."
     # Reference:- https://stackoverflow.com/questions/3645931/python-padding-punctuation-with-white-spaces-keeping
     # -punctuation
-    w = re.sub(r"([?.!,¿])", r" \1 ", w)
-    w = re.sub(r'[" "]+', " ", w)
 
     # replacing everything with space except (a-z, A-Z, ".", "?", "!", ",")
     w = re.sub(r"[^a-zA-Z?.!,¿]+", " ", w)
@@ -78,7 +82,9 @@ def preprocess_sentence(w):
     # adding a start and an end token to the sentence
     # so that the model know when to start and stop predicting.
     # w = '<start> ' + w + ' <end>'
-    return w
+    tokenizer = RegexpTokenizer(r'\w+')
+
+    return ' '.join(tokenizer.tokenize(w)).lower()
 
 
 # Converts the unicode file to ascii
@@ -103,3 +109,27 @@ def get_vocabulary(text):
     var = [word for sentence in text for word in sentence.split(' ')]
 
     return set(var)
+
+
+def create_dictionary():
+    en, pt = create_dataset(PATH, 30000, 0)
+    vocabulary = list(get_vocabulary(en))
+
+    dictionary = {}
+    for word in vocabulary:
+        try:
+            translation = TextBlob(word).translate(from_lang='en', to='pt-br')
+            translation = ''.join(list(translation))
+            synonyms = Search(translation).synonyms()
+            if type(synonyms) is int:
+                dictionary.setdefault(word, [translation])
+            else:
+                synonyms.append(translation)
+                dictionary.setdefault(word, synonyms)
+        except NotTranslated:
+            dictionary.setdefault(word, [word])
+
+    df = pd.DataFrame.from_dict(dictionary, orient='index')
+    df = df.T
+    df.to_csv('en-pt.csv', index=False)
+    return df

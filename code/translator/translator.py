@@ -3,9 +3,9 @@ import math
 import re
 import sys
 import nltk
-from util import get_vocabulary
+from util import get_vocabulary, create_dataset
 from unidecode import unidecode
-
+PATH = '../Resource/por.txt'
 if not sys.warnoptions:
     import warnings
 
@@ -113,7 +113,9 @@ def get_dic():
         word_en = split_line[0]
         word_pt = clean_text(split_line[1:])
         pt_en[word_en] = word_pt
-
+    en, pt = create_dataset(PATH, 5000, 0)
+    for en_tag, pt_tag in zip(en, pt):
+        pt_en[en_tag] = pt_tag
     return pt_en
 
 
@@ -137,6 +139,7 @@ class EATranslator:
         :param input_sentence: The input sentence
         :param target_sentence: target sentence
         """
+
         self.inp_vocabulary = input_sentence.split()
         self.tar_vocabulary = get_vocabulary(sentences_list)
         self.target_sentence = target_sentence
