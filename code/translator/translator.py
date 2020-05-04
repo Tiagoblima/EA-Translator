@@ -5,7 +5,8 @@ import sys
 import nltk
 from util import get_vocabulary, create_dataset
 from unidecode import unidecode
-PATH = '../Resource/por.txt'
+
+PATH = '../Resource/en-pt.csv'
 if not sys.warnoptions:
     import warnings
 
@@ -15,6 +16,7 @@ from collections import Counter
 from itertools import combinations
 from nltk import bleu
 from nltk.translate.bleu_score import SmoothingFunction
+import pandas as pd
 
 
 def get_word_count(raw_text):
@@ -106,17 +108,13 @@ DIC_PATH = '../Resource/PORTUGUE.TXT'
 
 
 def get_dic():
-    file = open(file=DIC_PATH, encoding='windows-1252')
-    pt_en = {}
-    for line in file.readlines():
-        split_line = line.split('\t')
-        word_en = split_line[0]
-        word_pt = clean_text(split_line[1:])
-        pt_en[word_en] = word_pt
-    en, pt = create_dataset(PATH, 5000, 0)
-    for en_tag, pt_tag in zip(en, pt):
-        pt_en[en_tag] = pt_tag
-    return pt_en
+    df = pd.read_csv(PATH).dropna()
+    df_dict = df.to_dict()
+    dictionary = {}
+    for key in df_dict.keys():
+        dictionary[key] = list(df_dict[key].values())
+
+    return dictionary
 
 
 class EATranslator:
@@ -162,7 +160,6 @@ class EATranslator:
 
             except KeyError:
                 pass
-
         assert len(self.generation) >= 1, "None of the words were found in the dictionary."
 
     def run_evaluations(self):
@@ -199,6 +196,7 @@ class EATranslator:
                     parents = parents[:-1]
                 bi_gram = []
             evaluation_array.sort(key=lambda tup: tup[-1], reverse=True)
+            print(evaluation_array)
             i += 1
             new_word = evaluation_array[0][0]
             if new_word not in parents:

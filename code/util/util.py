@@ -111,25 +111,4 @@ def get_vocabulary(text):
     return set(var)
 
 
-def create_dictionary():
-    en, pt = create_dataset(PATH, 30000, 0)
-    vocabulary = list(get_vocabulary(en))
 
-    dictionary = {}
-    for word in vocabulary:
-        try:
-            translation = TextBlob(word).translate(from_lang='en', to='pt-br')
-            translation = ''.join(list(translation))
-            synonyms = Search(translation).synonyms()
-            if type(synonyms) is int:
-                dictionary.setdefault(word, [translation])
-            else:
-                synonyms.append(translation)
-                dictionary.setdefault(word, synonyms)
-        except NotTranslated:
-            dictionary.setdefault(word, [word])
-
-    df = pd.DataFrame.from_dict(dictionary, orient='index')
-    df = df.T
-    df.to_csv('en-pt.csv', index=False)
-    return df
