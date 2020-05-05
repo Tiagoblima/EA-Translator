@@ -42,11 +42,11 @@ def create_dictionary():
 
 
 def main():
-    en, pt = create_dataset(PATH, 10000, 0)
+    en, pt = create_dataset(PATH, 30000, 0)
     print(en[100])
     print(pt[100])
 
-    translator = EATranslator(pt, en[100], pt[100])
+    translator = EATranslator(pt, en[5000], pt[5000])
     translator.run_evaluations()
 
 

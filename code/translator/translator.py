@@ -196,7 +196,7 @@ class EATranslator:
                     parents = parents[:-1]
                 bi_gram = []
             evaluation_array.sort(key=lambda tup: tup[-1], reverse=True)
-            print(evaluation_array)
+
             i += 1
             new_word = evaluation_array[0][0]
             if new_word not in parents:
@@ -217,6 +217,7 @@ class EATranslator:
         """
         # -------- Finds the first word -------- #
         word_fit = []
+        
         for word in self.found_sentence:
             fitness = bleu(hypothesis=word, references=self.target_sentence.split(' ')[:1],
                            auto_reweigh=True)
